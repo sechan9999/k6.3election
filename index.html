@@ -1,0 +1,752 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>6.3 지방선거 결과 대시보드</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.5.1" integrity="sha384-jb8JQMbMoBUzgWatfe6COACi2ljcDdZQ2OxczGA3bGNeWe+6DChMTBJemed7ZnvJ" crossorigin="anonymous"></script>
+  <style>
+    :root {
+      --bg-primary: #f0f2f5;
+      --bg-card: #ffffff;
+      --bg-header: #1a1f36;
+      --text-primary: #1a1f36;
+      --text-secondary: #6b7280;
+      --text-on-dark: #ffffff;
+      --ppp-color: #e03131;       /* 국민의힘 */
+      --dp-color: #1971c2;        /* 민주당 */
+      --inno-color: #0ca678;      /* 조국혁신당 */
+      --prog-color: #f76707;      /* 진보당 */
+      --positive: #2f9e44;
+      --negative: #e03131;
+      --neutral: #6b7280;
+      --gap: 16px;
+      --radius: 10px;
+    }
+
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans KR', sans-serif;
+      background: var(--bg-primary);
+      color: var(--text-primary);
+      line-height: 1.5;
+    }
+
+    .dashboard-container {
+      max-width: 1360px;
+      margin: 0 auto;
+      padding: var(--gap);
+    }
+
+    /* Header */
+    .dashboard-header {
+      background: var(--bg-header);
+      color: var(--text-on-dark);
+      padding: 20px 28px;
+      border-radius: var(--radius);
+      margin-bottom: var(--gap);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+    }
+
+    .header-left h1 {
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: -0.3px;
+    }
+
+    .header-left .subtitle {
+      font-size: 13px;
+      color: rgba(255,255,255,0.6);
+      margin-top: 3px;
+    }
+
+    .header-badges {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .badge {
+      padding: 5px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 600;
+    }
+
+    .badge-ppp { background: rgba(224,49,49,0.25); color: #ff8787; }
+    .badge-dp  { background: rgba(25,113,194,0.25); color: #74c0fc; }
+    .badge-inno { background: rgba(12,166,120,0.25); color: #63e6be; }
+    .badge-prog { background: rgba(247,103,7,0.25); color: #ffa94d; }
+
+    /* KPI Row */
+    .kpi-row {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: var(--gap);
+      margin-bottom: var(--gap);
+    }
+
+    .kpi-card {
+      background: var(--bg-card);
+      border-radius: var(--radius);
+      padding: 20px 22px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+      border-left: 4px solid var(--neutral);
+      position: relative;
+      overflow: hidden;
+    }
+
+    .kpi-card.ppp { border-left-color: var(--ppp-color); }
+    .kpi-card.dp  { border-left-color: var(--dp-color); }
+    .kpi-card.gain { border-left-color: var(--positive); }
+    .kpi-card.warning { border-left-color: #f59f00; }
+
+    .kpi-label {
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--text-secondary);
+      margin-bottom: 6px;
+    }
+
+    .kpi-value {
+      font-size: 30px;
+      font-weight: 800;
+      color: var(--text-primary);
+      margin-bottom: 4px;
+      line-height: 1.1;
+    }
+
+    .kpi-sub {
+      font-size: 12px;
+      color: var(--text-secondary);
+    }
+
+    .kpi-change {
+      font-size: 13px;
+      font-weight: 600;
+      margin-top: 6px;
+    }
+
+    .kpi-change.up   { color: var(--positive); }
+    .kpi-change.down { color: var(--negative); }
+    .kpi-change.close { color: #f59f00; }
+
+    /* Chart grid */
+    .chart-grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--gap);
+      margin-bottom: var(--gap);
+    }
+
+    .chart-grid-3 {
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: var(--gap);
+      margin-bottom: var(--gap);
+    }
+
+    .chart-card {
+      background: var(--bg-card);
+      border-radius: var(--radius);
+      padding: 20px 22px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    }
+
+    .chart-card.wide {
+      grid-column: span 2;
+    }
+
+    .chart-card h3 {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--text-primary);
+      margin-bottom: 4px;
+    }
+
+    .chart-card .chart-sub {
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin-bottom: 16px;
+    }
+
+    .chart-card canvas {
+      max-height: 260px;
+    }
+
+    /* Coalition math box */
+    .coalition-box {
+      background: #fff9db;
+      border: 1px solid #ffe066;
+      border-radius: 8px;
+      padding: 14px 16px;
+      margin-top: 14px;
+      font-size: 13px;
+    }
+
+    .coalition-box .math {
+      font-size: 18px;
+      font-weight: 800;
+      color: #e67700;
+      margin: 4px 0;
+    }
+
+    .coalition-box .verdict {
+      color: #5c4000;
+      font-size: 12px;
+    }
+
+    /* Close race bars */
+    .race-bar-wrapper { margin-bottom: 18px; }
+    .race-title { font-size: 13px; font-weight: 700; margin-bottom: 8px; color: var(--text-primary); }
+    .race-bar-row { display: flex; align-items: center; gap: 10px; margin-bottom: 5px; }
+    .race-party-label { width: 90px; font-size: 12px; color: var(--text-secondary); text-align: right; flex-shrink: 0; }
+    .race-bar-outer { flex: 1; background: #f1f3f5; border-radius: 4px; height: 22px; position: relative; overflow: hidden; }
+    .race-bar-fill { height: 100%; border-radius: 4px; display: flex; align-items: center; padding-left: 8px; font-size: 12px; font-weight: 700; color: #fff; transition: width 0.6s ease; }
+    .race-margin { font-size: 11px; color: var(--text-secondary); margin-top: 4px; text-align: center; }
+    .race-divider { border: none; border-top: 1px solid #e9ecef; margin: 18px 0; }
+
+    /* Seat change section */
+    .seat-section {
+      background: var(--bg-card);
+      border-radius: var(--radius);
+      padding: 20px 22px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+      margin-bottom: var(--gap);
+    }
+
+    .seat-section h3 { font-size: 14px; font-weight: 700; margin-bottom: 4px; }
+    .seat-section .chart-sub { font-size: 12px; color: var(--text-secondary); margin-bottom: 16px; }
+    .seat-section canvas { max-height: 220px; }
+
+    /* Table */
+    .table-section {
+      background: var(--bg-card);
+      border-radius: var(--radius);
+      padding: 20px 22px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+      margin-bottom: var(--gap);
+      overflow-x: auto;
+    }
+
+    .table-section h3 { font-size: 14px; font-weight: 700; margin-bottom: 4px; }
+    .table-section .chart-sub { font-size: 12px; color: var(--text-secondary); margin-bottom: 16px; }
+
+    .data-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .data-table thead th {
+      text-align: left;
+      padding: 10px 12px;
+      border-bottom: 2px solid #e9ecef;
+      color: var(--text-secondary);
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      white-space: nowrap;
+      cursor: pointer;
+      user-select: none;
+    }
+    .data-table thead th:hover { color: var(--text-primary); background: #f8f9fa; }
+    .data-table tbody td { padding: 10px 12px; border-bottom: 1px solid #f3f4f6; }
+    .data-table tbody tr:hover { background: #f8f9fa; }
+    .data-table tbody tr:last-child td { border-bottom: none; }
+
+    .party-pill {
+      display: inline-block;
+      padding: 2px 9px;
+      border-radius: 10px;
+      font-size: 11px;
+      font-weight: 700;
+    }
+
+    .pill-ppp  { background: rgba(224,49,49,0.12); color: #c92a2a; }
+    .pill-dp   { background: rgba(25,113,194,0.12); color: #1864ab; }
+    .pill-inno { background: rgba(12,166,120,0.12); color: #087f5b; }
+    .pill-prog { background: rgba(247,103,7,0.12); color: #c44500; }
+    .pill-ind  { background: rgba(107,114,128,0.12); color: #4b5563; }
+
+    .win-badge { font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 6px; background: #e9fac8; color: #2f9e44; }
+
+    /* Analysis section */
+    .analysis-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: var(--gap);
+      margin-bottom: var(--gap);
+    }
+
+    .analysis-card {
+      background: var(--bg-card);
+      border-radius: var(--radius);
+      padding: 20px 22px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+    }
+
+    .analysis-card h3 { font-size: 14px; font-weight: 700; margin-bottom: 12px; }
+    .analysis-card p { font-size: 13px; color: var(--text-secondary); line-height: 1.7; }
+    .analysis-card strong { color: var(--text-primary); }
+
+    .insight-item {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 12px;
+      align-items: flex-start;
+    }
+
+    .insight-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      margin-top: 5px;
+      flex-shrink: 0;
+    }
+
+    .insight-text { font-size: 13px; color: var(--text-secondary); line-height: 1.6; }
+    .insight-text strong { color: var(--text-primary); }
+
+    /* Footer */
+    .dashboard-footer {
+      text-align: center;
+      font-size: 11px;
+      color: var(--text-secondary);
+      padding: 12px 0;
+    }
+
+    @media (max-width: 900px) {
+      .chart-grid-2, .chart-grid-3, .analysis-grid { grid-template-columns: 1fr; }
+      .chart-card.wide { grid-column: span 1; }
+    }
+
+    @media (max-width: 600px) {
+      .kpi-row { grid-template-columns: 1fr 1fr; }
+    }
+  </style>
+</head>
+<body>
+<div class="dashboard-container">
+
+  <!-- Header -->
+  <header class="dashboard-header">
+    <div class="header-left">
+      <h1>🗳️ 6.3 지방선거 결과 분석 대시보드</h1>
+      <div class="subtitle">2026년 6월 3일 | 광역·기초단체장, 재보궐 선거 결과 및 정세 분석</div>
+    </div>
+    <div class="header-badges">
+      <span class="badge badge-ppp">국민의힘</span>
+      <span class="badge badge-dp">민주당</span>
+      <span class="badge badge-inno">조국혁신당</span>
+      <span class="badge badge-prog">진보당</span>
+    </div>
+  </header>
+
+  <!-- KPI Cards -->
+  <section class="kpi-row">
+    <div class="kpi-card ppp">
+      <div class="kpi-label">서울시장 득표차</div>
+      <div class="kpi-value">1.15%p</div>
+      <div class="kpi-sub">오세훈 49.22% vs 정원오 48.07%</div>
+      <div class="kpi-change close">⚠ 60,259표 초박빙</div>
+    </div>
+    <div class="kpi-card warning">
+      <div class="kpi-label">평택을 연합 정치 손실</div>
+      <div class="kpi-value">–21.7%p</div>
+      <div class="kpi-sub">민주+혁신 합산 56.3% → 패배</div>
+      <div class="kpi-change down">▼ 분열로 34.6%에 졌다</div>
+    </div>
+    <div class="kpi-card gain">
+      <div class="kpi-label">민주당 광역의석 변화</div>
+      <div class="kpi-value">5 → 12</div>
+      <div class="kpi-sub">2022년 대비 +7석 (+140%)</div>
+      <div class="kpi-change up">▲ 광역 경쟁 구도 전환</div>
+    </div>
+    <div class="kpi-card gain">
+      <div class="kpi-label">민주당 기초단체장</div>
+      <div class="kpi-value">63 → 123</div>
+      <div class="kpi-sub">2022년 대비 +60석 (+95%)</div>
+      <div class="kpi-change up">▲ 풀뿌리 2배 확대</div>
+    </div>
+    <div class="kpi-card dp">
+      <div class="kpi-label">진보당 기초의원</div>
+      <div class="kpi-value">30+</div>
+      <div class="kpi-sub">중대선거구제 효과</div>
+      <div class="kpi-change up">▲ 소수정당 의회 진입</div>
+    </div>
+  </section>
+
+  <!-- Close Races + Coalition Chart -->
+  <div class="chart-grid-2">
+
+    <!-- Close Races -->
+    <div class="chart-card">
+      <h3>🔴 초박빙 레이스 분석</h3>
+      <div class="chart-sub">주요 접전 선거구 득표율 비교</div>
+
+      <div class="race-bar-wrapper">
+        <div class="race-title">서울시장</div>
+        <div class="race-bar-row">
+          <div class="race-party-label">오세훈 (국힘)</div>
+          <div class="race-bar-outer">
+            <div class="race-bar-fill" style="width:49.22%; background:var(--ppp-color);">49.22%</div>
+          </div>
+        </div>
+        <div class="race-bar-row">
+          <div class="race-party-label">정원오 (민주)</div>
+          <div class="race-bar-outer">
+            <div class="race-bar-fill" style="width:48.07%; background:var(--dp-color);">48.07%</div>
+          </div>
+        </div>
+        <div class="race-margin">격차: <strong>1.15%p</strong> · 60,259표차</div>
+      </div>
+
+      <hr class="race-divider">
+
+      <div class="race-bar-wrapper">
+        <div class="race-title">부산 북구 재보궐</div>
+        <div class="race-bar-row">
+          <div class="race-party-label">한동훈 (국힘)</div>
+          <div class="race-bar-outer">
+            <div class="race-bar-fill" style="width:43.0%; background:var(--ppp-color);">43.0%</div>
+          </div>
+        </div>
+        <div class="race-bar-row">
+          <div class="race-party-label">하정우 (민주)</div>
+          <div class="race-bar-outer">
+            <div class="race-bar-fill" style="width:41.3%; background:var(--dp-color);">41.3%</div>
+          </div>
+        </div>
+        <div class="race-margin">격차: <strong>1.7%p</strong> · 1,382표차</div>
+      </div>
+    </div>
+
+    <!-- Pyeongtaek Coalition Failure -->
+    <div class="chart-card">
+      <h3>⚠️ 평택을: 연합 정치 실패 해부</h3>
+      <div class="chart-sub">재보궐선거 득표율 (민주+혁신당 합산 vs 국힘)</div>
+      <canvas id="pyeongtaekChart"></canvas>
+      <div class="coalition-box">
+        <div>민주 28.9% + 혁신 27.4% = <span class="math">56.3%</span></div>
+        <div class="verdict">단일화 시 34.6% 국힘 후보 대비 <strong>+21.7%p 우세</strong> 가능했지만, 분열로 패배</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Seat Changes -->
+  <div class="seat-section">
+    <h3>📊 민주당 의석 변화: 2022 → 2026</h3>
+    <div class="chart-sub">광역의석 및 기초단체장 비교 — 전반적인 경쟁 구조 전환</div>
+    <canvas id="seatChangeChart"></canvas>
+  </div>
+
+  <!-- Party Vote Share + Electoral Reform -->
+  <div class="chart-grid-2">
+    <div class="chart-card">
+      <h3>🏛️ 광역의석 분포 (2026)</h3>
+      <div class="chart-sub">민주당 12석 vs 국힘 중심 재편</div>
+      <canvas id="regionalSeatsChart"></canvas>
+    </div>
+
+    <div class="chart-card">
+      <h3>📈 중대선거구제 효과</h3>
+      <div class="chart-sub">소수정당 기초의원 당선 현황 (추정)</div>
+      <canvas id="electoralReformChart"></canvas>
+    </div>
+  </div>
+
+  <!-- Key Race Results Table -->
+  <div class="table-section">
+    <h3>🗂️ 주요 선거구 결과 요약</h3>
+    <div class="chart-sub">분석 블로그 기준 주요 레이스 결과 — 클릭하여 정렬</div>
+    <table class="data-table" id="resultsTable">
+      <thead>
+        <tr>
+          <th onclick="sortTable(0)">선거구 ↕</th>
+          <th onclick="sortTable(1)">선거 종류 ↕</th>
+          <th onclick="sortTable(2)">당선자</th>
+          <th onclick="sortTable(3)">소속 정당</th>
+          <th onclick="sortTable(4)">득표율 ↕</th>
+          <th onclick="sortTable(5)">2위 후보</th>
+          <th onclick="sortTable(6)">격차 ↕</th>
+          <th onclick="sortTable(7)">분석 포인트</th>
+        </tr>
+      </thead>
+      <tbody id="tableBody"></tbody>
+    </table>
+  </div>
+
+  <!-- Analysis Cards -->
+  <div class="analysis-grid">
+    <div class="analysis-card">
+      <h3>🔍 데이터로 확인된 핵심 발견</h3>
+      <div class="insight-item">
+        <div class="insight-dot" style="background:var(--negative)"></div>
+        <div class="insight-text"><strong>평택을 연합 실패:</strong> 민주+혁신 합산 56.3%가 34.6%에 패배. "죽 써서 개 준 꼴" 진단이 수치로 정확히 확인됨.</div>
+      </div>
+      <div class="insight-item">
+        <div class="insight-dot" style="background:#f59f00"></div>
+        <div class="insight-text"><strong>서울시장 초박빙:</strong> 1.15%p 차이. 후보 단일화 또는 전략 조정이 있었다면 결과가 뒤집힐 수 있었던 수준.</div>
+      </div>
+      <div class="insight-item">
+        <div class="insight-dot" style="background:var(--positive)"></div>
+        <div class="insight-text"><strong>구조적 전환:</strong> 민주당 광역 5→12석, 기초 63→123석. 단순 패배가 아닌 '기대치 대비 실패'에 가까운 구조.</div>
+      </div>
+      <div class="insight-item">
+        <div class="insight-dot" style="background:var(--prog-color)"></div>
+        <div class="insight-text"><strong>중대선거구 효과:</strong> 진보당 기초의원 30명+ 당선. 소선거구 독점 구조 균열 시작.</div>
+      </div>
+    </div>
+
+    <div class="analysis-card">
+      <h3>📌 정해랑 진단 vs 데이터 검증</h3>
+      <div class="insight-item">
+        <div class="insight-dot" style="background:var(--positive)"></div>
+        <div class="insight-text"><strong>일치:</strong> 연합 정치 실패(평택을), 서울 초박빙, 부산 북구 한동훈 자력 생존 — 수치로 정확히 뒷받침.</div>
+      </div>
+      <div class="insight-item">
+        <div class="insight-dot" style="background:#f59f00"></div>
+        <div class="insight-text"><strong>해석 차이:</strong> '실패'(정해랑) vs '구조적 경쟁 전환'(데이터 시각). 같은 수치를 기대치 기준점을 어디에 두느냐의 차이.</div>
+      </div>
+      <div class="insight-item">
+        <div class="insight-dot" style="background:var(--dp-color)"></div>
+        <div class="insight-text"><strong>제도 개혁 과제:</strong> 결선투표제 도입 시 평택을 같은 분열 패배 구조 차단 가능 — 데이터가 제도 개혁 필요성을 역설함.</div>
+      </div>
+      <div class="insight-item">
+        <div class="insight-dot" style="background:var(--ppp-color)"></div>
+        <div class="insight-text"><strong>보수 재건 신호:</strong> 한동훈 국힘 내 분열에도 1,382표차 생존 — 정해랑이 경계한 보수 저력 데이터로 확인.</div>
+      </div>
+    </div>
+  </div>
+
+  <footer class="dashboard-footer">
+    데이터 출처: tcgyver.log (velog.io/@tcgyver/6.3election) · 슬로우레터 · 분석: 탁가이버 + 정해랑 뉴욕뉴저지시국회의 워크숍
+  </footer>
+
+</div>
+
+<script>
+// ─── DATA ───────────────────────────────────────────────
+const RESULTS_DATA = [
+  { district:'서울시장', type:'광역단체장', winner:'오세훈', party:'국힘', winPct:49.22, runner:'정원오 (민주)', margin:'1.15%p', note:'초박빙 — 60,259표차' },
+  { district:'부산 북구', type:'재보궐', winner:'한동훈', party:'국힘', winPct:43.0, runner:'하정우 (민주)', margin:'1.7%p', note:'국힘 내 분열에도 1,382표차 생존' },
+  { district:'평택을', type:'재보궐', winner:'유의동', party:'국힘', winPct:34.6, runner:'김용남 (민주) 28.9%', margin:'5.7%p', note:'분열로 민주+혁신 56.3% 연합이 패배' },
+  { district:'대구 (광역)', type:'광역단체장', winner:'국힘 계열', party:'국힘', winPct:null, runner:'민주당', margin:'압승', note:'보수 거점 유지' },
+  { district:'경남 (광역)', type:'광역단체장', winner:'국힘 계열', party:'국힘', winPct:null, runner:'민주당', margin:'유지', note:'개혁 진영 공략 실패' },
+  { district:'안동', type:'기초의원', winner:'허승규', party:'녹색당', winPct:null, runner:'양당 후보', margin:'진입', note:'광장 시민 후보 추천 운동 성과' },
+];
+
+const tableBody = document.getElementById('tableBody');
+let sortDir = {};
+
+function partyClass(party) {
+  if (party === '국힘') return 'ppp';
+  if (party === '민주') return 'dp';
+  if (party === '혁신당') return 'inno';
+  if (party === '진보당' || party === '녹색당') return 'prog';
+  return 'ind';
+}
+
+function renderTable(data) {
+  tableBody.innerHTML = '';
+  data.forEach(row => {
+    const cls = partyClass(row.party);
+    const pctText = row.winPct !== null ? row.winPct + '%' : '–';
+    tableBody.innerHTML += `
+      <tr>
+        <td><strong>${row.district}</strong></td>
+        <td>${row.type}</td>
+        <td>${row.winner} <span class="win-badge">당선</span></td>
+        <td><span class="party-pill pill-${cls}">${row.party}</span></td>
+        <td>${pctText}</td>
+        <td>${row.runner}</td>
+        <td>${row.margin}</td>
+        <td style="color:#6b7280;font-size:12px;">${row.note}</td>
+      </tr>`;
+  });
+}
+
+renderTable(RESULTS_DATA);
+
+window.sortTable = function(col) {
+  sortDir[col] = !sortDir[col];
+  const sorted = [...RESULTS_DATA].sort((a, b) => {
+    const keys = ['district','type','winner','party','winPct','runner','margin','note'];
+    const aVal = a[keys[col]] ?? '';
+    const bVal = b[keys[col]] ?? '';
+    if (aVal < bVal) return sortDir[col] ? -1 : 1;
+    if (aVal > bVal) return sortDir[col] ? 1 : -1;
+    return 0;
+  });
+  renderTable(sorted);
+};
+
+// ─── COLOR CONSTANTS ─────────────────────────────────────
+const PPP   = '#e03131';
+const DP    = '#1971c2';
+const INNO  = '#0ca678';
+const PROG  = '#f76707';
+const GRAY  = '#adb5bd';
+
+// ─── 1. Pyeongtaek Coalition Chart ───────────────────────
+(function() {
+  const ctx = document.getElementById('pyeongtaekChart').getContext('2d');
+  new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: ['유의동 (국힘)', '김용남 (민주)', '조국 (혁신당)', '민주+혁신 합산'],
+      datasets: [{
+        data: [34.6, 28.9, 27.4, 56.3],
+        backgroundColor: [PPP, DP, INNO, DP + '88'],
+        borderColor: [PPP, DP, INNO, DP],
+        borderWidth: [0, 0, 0, 2],
+        borderDash: [[], [], [], [5, 3]],
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      indexAxis: 'y',
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: ctx => `득표율: ${ctx.parsed.x}%`
+          }
+        }
+      },
+      scales: {
+        x: {
+          beginAtZero: true,
+          max: 70,
+          ticks: { callback: v => v + '%' }
+        },
+        y: { grid: { display: false } }
+      }
+    }
+  });
+})();
+
+// ─── 2. Seat Change Chart ────────────────────────────────
+(function() {
+  const ctx = document.getElementById('seatChangeChart').getContext('2d');
+  new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: ['광역의석', '기초단체장'],
+      datasets: [
+        {
+          label: '2022년',
+          data: [5, 63],
+          backgroundColor: DP + '55',
+          borderColor: DP,
+          borderWidth: 2,
+          borderRadius: 6,
+        },
+        {
+          label: '2026년',
+          data: [12, 123],
+          backgroundColor: DP,
+          borderColor: DP,
+          borderWidth: 0,
+          borderRadius: 6,
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { position: 'top', labels: { usePointStyle: true, padding: 16 } },
+        tooltip: {
+          callbacks: {
+            label: ctx => `${ctx.dataset.label}: ${ctx.parsed.y}석`
+          }
+        }
+      },
+      scales: {
+        x: { grid: { display: false } },
+        y: {
+          beginAtZero: true,
+          ticks: { callback: v => v + '석' }
+        }
+      }
+    }
+  });
+})();
+
+// ─── 3. Regional Seats 2026 ──────────────────────────────
+(function() {
+  const ctx = document.getElementById('regionalSeatsChart').getContext('2d');
+  new Chart(ctx, {
+    type: 'doughnut',
+    data: {
+      labels: ['민주당 (12석)', '국힘 계열 (기타)'],
+      datasets: [{
+        data: [12, 5],
+        backgroundColor: [DP, PPP + 'bb'],
+        borderColor: '#fff',
+        borderWidth: 3,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      cutout: '60%',
+      plugins: {
+        legend: { position: 'bottom', labels: { usePointStyle: true, padding: 14 } },
+        tooltip: {
+          callbacks: {
+            label: ctx => `${ctx.label}: ${ctx.parsed}석`
+          }
+        }
+      }
+    }
+  });
+})();
+
+// ─── 4. Electoral Reform Effect ─────────────────────────
+(function() {
+  const ctx = document.getElementById('electoralReformChart').getContext('2d');
+  new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: ['소선거구제\n(이전)', '중대선거구제\n도입 후'],
+      datasets: [
+        {
+          label: '진보당·소수 기초의원',
+          data: [5, 30],
+          backgroundColor: [PROG + '55', PROG],
+          borderColor: [PROG, PROG],
+          borderWidth: 2,
+          borderRadius: 6,
+        }
+      ]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: ctx => `당선: ${ctx.parsed.y}명+`
+          }
+        }
+      },
+      scales: {
+        x: { grid: { display: false } },
+        y: {
+          beginAtZero: true,
+          ticks: { callback: v => v + '명' }
+        }
+      }
+    }
+  });
+})();
+</script>
+</body>
+</html>
